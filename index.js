@@ -4,15 +4,14 @@ import * as cheerio from 'cheerio';
 import cors from 'cors'
 
 const app = express()
-const port = 8000
+const port = process.env.PORT || 8000;
 const domainUrl = 'https://site.q10.com'
 const loginUrl = domainUrl + '/User/Login?returnUrl=%2F'
 
 app.use(express.static('public'))
 
 app.use(cors({
-    credentials: true,
-    origin: "http://localhost:8000",
+    credentials: true
 }))
 
 app.get('/', (req, res) => {

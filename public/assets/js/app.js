@@ -1,6 +1,6 @@
 const divResults = document.querySelector('#resultados')
 const divJsonResponse = document.querySelector('#json-response')
-const fetchURL = 'http://localhost:8000'
+const fetchURL = '.';
 
 function output(inp) {
     divJsonResponse.appendChild(document.createElement('pre')).innerHTML = inp;
