@@ -1,0 +1,15 @@
+pre {outline: 1px solid #ccc; padding: 5px; margin: 5px; color: #1B9FF1; background-color: #212529;}
+.string { color: #CE9178; }
+.number { color: #A7CE9B; }
+.boolean { color: #569CD6; }
+.null { color: #569CD6; }
+.key { color: #9CDCFE; }
+
+/*
+pre {outline: 1px solid #ccc; padding: 5px; margin: 5px; }
+.string { color: green; }
+.number { color: darkorange; }
+.boolean { color: blue; }
+.null { color: magenta; }
+.key { color: red; }
+*/
