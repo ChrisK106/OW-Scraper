@@ -138,7 +138,7 @@ app.get('/notas/:matriculaId/periodo/:periodoId', (req, res) => {
                         })
 
                         console.log(data)
-                        res.jsonp(data)
+                        res.json(data)
                     })
 
                 })
