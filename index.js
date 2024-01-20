@@ -25,7 +25,7 @@ app.get('/notasxperiodo', (req, res) => {
 app.get('/notas/:matriculaId/periodo/:periodoId', (req, res) => {
 
     let html, $
-    let subdomainsUrl, institutionUrl, roleUrl
+    let subdomainsUrl, institutionUrl, roleUrl, authUrl
     let aplentId
 
     const axiosInstance = axios.create({
@@ -63,84 +63,92 @@ app.get('/notas/:matriculaId/periodo/:periodoId', (req, res) => {
                 axiosInstance.post(roleUrl)
                 .then(response => {
 
-                    axiosInstance.interceptors.request.use(config => {
-                        config.headers['Cookie'] = response.headers['set-cookie'];
-                        return config;
-                    })
+                    html = response.data
+                    $ = cheerio.load(html)
+                    authUrl = domainUrl + $('#dobleFactor').attr('action')
+                    console.log(authUrl)
 
-                    let matriculaId = req.params['matriculaId']
-                    let periodoId = req.params['periodoId']
-                    let notasUrl = domainUrl + '/Resultados/Lista?matriculaPrograma=' + matriculaId + '&periodo=' + periodoId + '&tipoEvaluacion=1'
-                    
-                    console.log(notasUrl)
-
-                    axiosInstance.get(notasUrl)
+                    axiosInstance.post(authUrl)
                     .then(response => {
-                        html = response.data
-                        $ = cheerio.load(html)
 
-                        let data = []
-                        let promedioPeriodo = $('.cardPromedio').find('h2').text().trim()
-
-                        data.push(promedioPeriodo)
-
-                        $('.asignatura').each(function(asignaturaIndex = 0) {
-
-                            let cursos = []
-                            let header = $('.header', $(this)).text().trim()
-                            //const url = $(this).find('h2').attr('href')
-
-                            $('.table-responsive', $(this)).each(function(tableIndex = 0) {
-                                
-                                let capacidades = []
-                                let nombreCurso, docenteCurso, periodoCurso, estadoCurso, inasistencia, notaFinal
-        
-                                nombreCurso = $('h4.title-asig', $(this)).text().trim()
-                                docenteCurso = $('p:eq(0)', $(this)).text().trim().substring(9)
-                                periodoCurso = $('p:eq(1)', $(this)).text().trim().substring(10)
-                                estadoCurso = $('p:eq(2)', $(this)).text().trim().substring(8)
-
-                                inasistencia = $('div:eq(3)', '.asignatura:eq(' + asignaturaIndex + ') .table-responsive:eq(' + tableIndex + ') + div').text().trim()
-                                notaFinal = $('div:eq(6)', '.asignatura:eq(' + asignaturaIndex + ') .table-responsive:eq(' + tableIndex + ') + div').text().trim()
-
-                                let trIndex = 1
-
-                                $('tbody tr:even', $(this)).each(function() {
-
-                                    let descripcionCapacidad, notaCapacidad
-
-                                    descripcionCapacidad = $("[rowspan=1]", $(this)).text().trim().substring(12)
-                                    notaCapacidad = $('tbody tr:eq(' + trIndex + ') .nota-capacidad:eq(1)', '.asignatura:eq(' + asignaturaIndex + ') .table-responsive:eq(' + tableIndex + ')').text().trim()
-                                    
-                                    capacidades.push({
-                                        descripcionCapacidad, notaCapacidad
-                                    })
-
-                                    trIndex = trIndex+2;
-                                })
-
-                                //console.log(capacidades)
-        
-                                cursos.push({
-                                    nombreCurso, docenteCurso, periodoCurso, estadoCurso, inasistencia, notaFinal, capacidades
-                                })
-
-                                //tableIndex++
-                            })
-
-                            //console.log(cursos)
-
-                            data.push({
-                                header, cursos
-                            })
-
-                            //asignaturaIndex++
+                        axiosInstance.interceptors.request.use(config => {
+                            config.headers['Cookie'] = response.headers['set-cookie'];
+                            return config;
                         })
 
-                        console.log(data)
-                        res.json(data)
-                    })
+                        let matriculaId = req.params['matriculaId']
+                        let periodoId = req.params['periodoId']
+                        let notasUrl = domainUrl + '/Resultados/Lista?matriculaPrograma=' + matriculaId + '&periodo=' + periodoId + '&tipoEvaluacion=1'
+                        
+                        console.log(notasUrl)
 
+                        axiosInstance.get(notasUrl)
+                        .then(response => {
+                            html = response.data
+                            $ = cheerio.load(html)
+
+                            let data = []
+                            let promedioPeriodo = $('.cardPromedio').find('h2').text().trim()
+
+                            data.push(promedioPeriodo)
+
+                            $('.asignatura').each(function(asignaturaIndex = 0) {
+
+                                let cursos = []
+                                let header = $('.header', $(this)).text().trim()
+                                //const url = $(this).find('h2').attr('href')
+
+                                $('.table-responsive', $(this)).each(function(tableIndex = 0) {
+                                    
+                                    let capacidades = []
+                                    let nombreCurso, docenteCurso, periodoCurso, estadoCurso, inasistencia, notaFinal
+            
+                                    nombreCurso = $('h4.title-asig', $(this)).text().trim()
+                                    docenteCurso = $('p:eq(0)', $(this)).text().trim().substring(9)
+                                    periodoCurso = $('p:eq(1)', $(this)).text().trim().substring(10)
+                                    estadoCurso = $('p:eq(2)', $(this)).text().trim().substring(8)
+
+                                    inasistencia = $('div:eq(3)', '.asignatura:eq(' + asignaturaIndex + ') .table-responsive:eq(' + tableIndex + ') + div').text().trim()
+                                    notaFinal = $('div:eq(6)', '.asignatura:eq(' + asignaturaIndex + ') .table-responsive:eq(' + tableIndex + ') + div').text().trim()
+
+                                    let trIndex = 1
+
+                                    $('tbody tr:even', $(this)).each(function() {
+
+                                        let descripcionCapacidad, notaCapacidad
+
+                                        descripcionCapacidad = $("[rowspan=1]", $(this)).text().trim().substring(12)
+                                        notaCapacidad = $('tbody tr:eq(' + trIndex + ') .nota-capacidad:eq(1)', '.asignatura:eq(' + asignaturaIndex + ') .table-responsive:eq(' + tableIndex + ')').text().trim()
+                                        
+                                        capacidades.push({
+                                            descripcionCapacidad, notaCapacidad
+                                        })
+
+                                        trIndex = trIndex+2;
+                                    })
+
+                                    //console.log(capacidades)
+            
+                                    cursos.push({
+                                        nombreCurso, docenteCurso, periodoCurso, estadoCurso, inasistencia, notaFinal, capacidades
+                                    })
+
+                                    //tableIndex++
+                                })
+
+                                //console.log(cursos)
+
+                                data.push({
+                                    header, cursos
+                                })
+
+                                //asignaturaIndex++
+                            })
+
+                            console.log(data)
+                            res.json(data)
+                        })
+                    })
                 })
             })
         })
