@@ -1,4 +1,5 @@
 [![CodeQL](https://github.com/ChrisK106/OW-Scraper/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/ChrisK106/OW-Scraper/actions/workflows/github-code-scanning/codeql)
+[![pages-build-deployment](https://github.com/ChrisK106/OW-Scraper/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/ChrisK106/OW-Scraper/actions/workflows/pages/pages-build-deployment)
 
 # ![ows_green_text_logo](https://github.com/ChrisK106/OW-Scraper/assets/46413807/e301f28c-d7c5-48ef-b784-d075fc5a276b)
 
