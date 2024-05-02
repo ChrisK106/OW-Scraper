@@ -1,14 +1,18 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import cors from 'cors'
 
-const app = express()
+// Constants
 const port = process.env.PORT || 8000;
 const domainUrl = 'https://site.q10.com'
 const loginUrl = domainUrl + '/User/Login?returnUrl=%2F'
 const loginUser = 'chris.ae.cgca@gmail.com'
 const loginPassword = 'SMjutz215'
+
+// Create an Express application
+const app = express()
 
 // Setting Express to serve static files from the public folder
 app.use(express.static('public'))
@@ -17,6 +21,15 @@ app.use(express.static('public'))
 app.use(cors({
     credentials: true
 }))
+
+// Setting Express to use rate-limiting middleware
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // max 10 requests per windowMs (10 requests per minute)
+});
+
+// Apply rate limiter to all requests
+app.use(limiter);
 
 // GET request to the root URL 
 app.get('/', (req, res) => {
