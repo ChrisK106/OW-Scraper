@@ -59,65 +59,71 @@ async function login(axiosInstance) {
     let subdomainsUrl, institutionUrl, roleUrl, authUrl
     let aplentId, inst_t, rol_t, auth_t
     let cookies = []
-    
-    await axiosInstance.post(loginUrl, {
-        NombreUsuario: loginUser,
-        Contrasena: loginPassword
-    })
-    .then(async response => {
-        html = response.data
-        $ = cheerio.load(html)
-        subdomainsUrl = domainUrl + $('#form-subdomains').attr('action')
-        aplentId = new URL(subdomainsUrl).searchParams.get('aplentId')
-        console.log(subdomainsUrl)
 
-        await axiosInstance.post(subdomainsUrl, {
-            pass: loginPassword,
-            subdomain: '.'
+    try {
+        await axiosInstance.post(loginUrl, {
+            NombreUsuario: loginUser,
+            Contrasena: loginPassword
         })
         .then(async response => {
             html = response.data
             $ = cheerio.load(html)
-            institutionUrl = domainUrl + $('#institution-selection').attr('action')
-            inst_t = $('#institution-selection').find('input[name=inst_t]').attr('value')
-            console.log(institutionUrl)
-            
-            await axiosInstance.post(institutionUrl, {
-                inst_t: inst_t,
-                aplentId: aplentId
+            subdomainsUrl = domainUrl + $('#form-subdomains').attr('action')
+            aplentId = new URL(subdomainsUrl).searchParams.get('aplentId')
+            console.log(subdomainsUrl)
+
+            await axiosInstance.post(subdomainsUrl, {
+                pass: loginPassword,
+                subdomain: '.'
             })
             .then(async response => {
                 html = response.data
                 $ = cheerio.load(html)
-                roleUrl = domainUrl + $('#role-selection').attr('action')
-                rol_t = $('#role-selection').find('input[name=rol_t]').attr('value')
-                console.log(roleUrl)
-
-                await axiosInstance.post(roleUrl, {
-                    rol_t: rol_t,
-                    roleId: 1
+                institutionUrl = domainUrl + $('#institution-selection').attr('action')
+                inst_t = $('#institution-selection').find('input[name=inst_t]').attr('value')
+                console.log(institutionUrl)
+                
+                await axiosInstance.post(institutionUrl, {
+                    inst_t: inst_t,
+                    aplentId: aplentId
                 })
                 .then(async response => {
                     html = response.data
                     $ = cheerio.load(html)
-                    authUrl = domainUrl + $('#dobleFactor').attr('action')
-                    auth_t = $('#dobleFactor').find('input[name=t]').attr('value')
-                    console.log(authUrl + '?t=' + auth_t)
+                    roleUrl = domainUrl + $('#role-selection').attr('action')
+                    rol_t = $('#role-selection').find('input[name=rol_t]').attr('value')
+                    console.log(roleUrl)
 
-                    await axiosInstance.post(authUrl, {
-                        t: auth_t
+                    await axiosInstance.post(roleUrl, {
+                        rol_t: rol_t,
+                        roleId: 1
                     })
-                    .then(response => {
-                        cookies = response.headers['set-cookie']
-                        axiosInstance = updateCookies(axiosInstance, cookies)
-                        console.log('Logged in')
+                    .then(async response => {
+                        html = response.data
+                        $ = cheerio.load(html)
+                        authUrl = domainUrl + $('#dobleFactor').attr('action')
+                        auth_t = $('#dobleFactor').find('input[name=ta]').attr('value')
+                        console.log(authUrl + '?ta=' + auth_t)
+
+                        await axiosInstance.post(authUrl, {
+                            ta: auth_t
+                        })
+                        .then(response => {
+                            cookies = response.headers['set-cookie']
+                            axiosInstance = updateCookies(axiosInstance, cookies)
+                            console.log('Logged in')
+                        })
                     })
                 })
             })
         })
-    })
 
-    return axiosInstance
+        return axiosInstance
+
+    // Catch any errors and log them to the console
+    } catch (error) {
+        console.error('Login failed:', error.message)
+    }
 }
 
 // Function to change the role to Super Admin and return the axios instance with the cookies
@@ -153,6 +159,13 @@ app.get('/notas/:matriculaId/periodo/:periodoId', async (req, res) => {
     
     // Login to the site and return the axios instance with the cookies
     axiosInstance = await login(axiosInstance)
+
+    // Check if login was successful
+    if (!axiosInstance) {
+        // If login was not successful, send a JSON response to the client indicating that the login failed
+        res.json({ message: 'Login failed' })
+        return
+    }
 
     // Get the matriculaId and periodoId from the URL
     let matriculaId = req.params['matriculaId']
@@ -245,6 +258,13 @@ app.get('/listar-videos', async (req, res) => {
 
     // Login to the site and return the axios instance with the cookies
     axiosInstance = await login(axiosInstance)
+
+    // Check if login was successful
+    if (!axiosInstance) {
+        // If login was not successful, send a JSON response to the client indicating that the login failed
+        res.json({ message: 'Login failed' })
+        return
+    }
 
     // Change the role to Super Admin and return the axios instance with the cookies
     axiosInstance = await changeRoleToSuperAdmin(axiosInstance)
