@@ -1,7 +1,8 @@
-import express from 'express';
-import rateLimit from 'express-rate-limit';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import express from 'express'
+import rateLimit from 'express-rate-limit'
+import axios from 'axios'
+import * as cheerio from 'cheerio'
+import * as fs from 'node:fs';
 import cors from 'cors'
 
 // Constants
@@ -10,6 +11,8 @@ const domainUrl = 'https://site.q10.com'
 const loginUrl = domainUrl + '/User/Login?returnUrl=%2F'
 const loginUser = 'chris.ae.cgca@gmail.com'
 const loginPassword = 'SMjutz215'
+const durationRegEx = 'Duración:\\s*([\\d.]+\\s*(horas|hora|minutos|minuto|segundos|segundo))'
+const sizeRegEx = 'Tamaño:\\s*([\\d.]+\\s*(KB|MB|GB))'
 
 // Create an Express application
 const app = express()
@@ -26,10 +29,10 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 10, // max 10 requests per windowMs (10 requests per minute)
-});
+})
 
 // Apply rate limiter to all requests
-app.use(limiter);
+app.use(limiter)
 
 // GET request to the root URL 
 app.get('/', (req, res) => {
@@ -243,7 +246,38 @@ app.get('/notas/:matriculaId/periodo/:periodoId', async (req, res) => {
 })
 
 // GET request to /listar-videos
-// This route scrapes the video recordings of the virtual classes
+// This route scrapes the video recordings of the virtual classes and returns the data in JSON format
+// The route accepts query parameters to filter the results by page range, subject IDs, and whether to include download URLs
+// The query parameters are:
+// - from: the starting page number (default is 1)
+// - to: the ending page number (default is 20)
+// - subjectIds: a list of subject IDs to filter the results separated by '+' (e.g., PML302_2023_2+PML103_2023_2_GRUPO_1)
+// - hasSubjectId: a boolean flag to indicate whether to include classes with empty subject IDs (default is false)
+// - hasDownloadUrl: a boolean flag to indicate whether to include download URLs for the video recordings (default is false)
+// - downloadFile: a boolean flag to indicate whether to download the data as a file (default is false)
+// // The route returns a JSON response with the following structure:
+// [
+//   {
+//     date: '2023-10-01',
+//     subjectId: 'PML302_2023_2',
+//     subjectName: 'Music Theory',
+//     teacher: 'John Doe',
+//     videos: [
+//       {
+//         info: 'Duration: 1h 30m. Size: 500MB',
+//         audit: '2023-10-01 10:00',
+//         url: '/path/to/video1.mp4',
+//         downloadUrl: 'https://site.q10.com/path/to/video1.mp4'
+//       },
+//       {
+//         info: 'Duration: 1h 45m. Size: 600MB',
+//         audit: '2023-10-01 11:00',
+//         url: '/path/to/video2.mp4',
+//         downloadUrl: 'https://site.q10.com/path/to/video2.mp4'
+//       }
+//     ]
+//   }
+// ]
 app.get('/listar-videos', async (req, res) => {
     
     let html, $
@@ -262,7 +296,8 @@ app.get('/listar-videos', async (req, res) => {
     // Check if login was successful
     if (!axiosInstance) {
         // If login was not successful, send a JSON response to the client indicating that the login failed
-        res.json({ message: 'Login failed' })
+        console.error('Login failed')
+        res.status(401).json({ message: 'Login failed' })
         return
     }
 
@@ -272,78 +307,142 @@ app.get('/listar-videos', async (req, res) => {
     let data = []
     let recordedClassesListUrl = domainUrl + '/AulasVirtuales/ClasesGrabadas/Lista?pagina='
 
-    //get page range from query params or default to 1-20
+    // Get page range from query params or default to 1-20
     let pageFrom = req.query.from || 1
     let pageTo = req.query.to || 20
 
-    //check if hasSubjectId flag is set to true or default to false
+    // Get subjectIds from query params or default to an empty array
+    // If subjectIds is provided, split it by '+' to get an array of subject IDs
+    let subjectIds = req.query.subjectIds ? req.query.subjectIds.split('+') : []
+
+    // Check if hasSubjectId flag is set to true or default to false
     let hasSubjectIdFlag = req.query.hasSubjectId === 'true'
 
+    // Check if hasDownloadUrl flag is set to true or default to false
+    let hasDownloadUrlFlag = req.query.hasDownloadUrl === 'true'
+
+    // Check if downloadFile flag is set to true or default to false
+    let downloadFileFlag = req.query.downloadFile === 'true'
+    
     console.log('Página desde: ' + pageFrom + ' hasta: ' + pageTo)
     
     for (let i = pageFrom; i <= pageTo; i++) {
         await axiosInstance.get(recordedClassesListUrl + i)
         .then(async response => {
             
-            //load response
+            // Load response
             html = response.data
             $ = cheerio.load(html)
 
-            //check if there are no results
-            if($('.no-results').text().trim() === 'No hay registros') return
+            // Check if there are no results
+            //if($('.no-results').text().trim() === 'No hay registros') return
 
-            //get all recorded classes in current page
-            let recs = $('body > div > div > div.table-responsive > table > tbody > tr')
-            
-            let date, subjectId, subjectName, teacher, roomId
-            
-            //iterate over recorded classes (up to 12 per page)
+            // Get all recorded classes in current page
+            let recs = $('.clases-programadas > tr')
+
+            let date, subjectId, subjectName, teacher
+
+            // Iterate over recorded classes (up to 12 per page)
             for (let rec of recs) {
 
                 console.log('Página ' + i + ' - Rec ' + (recs.index(rec) + 1) + ' de ' + recs.length)
 
-                date = $('td:eq(0)', $(rec)).text().trim()
-                subjectId = $('td:eq(1)', $(rec)).text().trim()
-                subjectName = $('td:eq(2)', $(rec)).text().trim()
-                teacher = $('td:eq(3)', $(rec)).text().trim()
-                roomId = $('td:eq(4)', $(rec)).text().trim()
-                
-                //check if subjectId is empty and hasSubjectIdFlag is true to skip current class
-                if (hasSubjectIdFlag && subjectId === '') continue
+                date = $('td:eq(1)', $(rec)).text().trim()
+                subjectId = $('td:eq(2)', $(rec)).contents().filter((_, el) => el.type === 'text').first().text().trim()
+                subjectName = $('td:eq(3)', $(rec)).text().trim()
+                teacher = $('td:eq(2) > b', $(rec)).text().trim()
 
+                // Check if subjectId is empty and hasSubjectIdFlag is true to skip current class
+                if (subjectId === '' && hasSubjectIdFlag) continue
+
+                // Look for subjectId in subjectIds array if subjectIds is not empty, then skip current class if not found
+                if (subjectIds.length > 0 && !subjectIds.includes(subjectId)) continue
+
+                // Initialize videos array for current class
                 let videos = []
 
-                //check if class has video recordings
+                // Check if class has video recordings
                 if ($('td:eq(5)', $(rec)).text().trim() !== 'La clase virtual no se llevó a cabo') {
 
-                    //get video recordings of current class
-                    let vids = $('body > div > div > div.table-responsive > table > tbody > tr:nth-child(' + (recs.index(rec) + 1) + ') > td:nth-child(6) > table > tbody > tr')
+                    // Get video recordings of current class
+                    let vids = $('td:eq(5) > div', $(rec))
 
-                    let info, audit, url, downloadUrl
+                    let info, duration, size, url, downloadUrl
 
-                    //iterate over video recordings
+                    // Iterate over video recordings
                     for (let vid of vids) {
-                        info = $(vid).find('span').attr('title')
-                        audit = $(vid).find('i').attr('title')
-                        url = $(vid).find('a').attr('data-relative')
+                        info = $(vid).find('.informacion-grabacion > span').attr('title')
+                        
+                        // Extract duration and size from info using regex
+                        const durationMatch = info.match(new RegExp(durationRegEx, 'i'))
+                        const sizeMatch = info.match(new RegExp(sizeRegEx, 'i'))
+                        duration = durationMatch ? durationMatch[1] : null
+                        size = sizeMatch ? sizeMatch[1] : null
 
-                        if (url !== undefined) {
+                        url = $(vid).find('div > a').attr('data-relative')
+
+                        if (url !== undefined && hasDownloadUrlFlag) {
                             await axiosInstance.get(domainUrl + '/Archivo/AzureStorage/GetFileUrl?url=' + url)
                             .then(response => {
                                 downloadUrl = response.data
                             })
                         }
-                        videos.push({ info, audit, url, downloadUrl })
+
+                        // If size is not null, push video data to videos array
+                        if (size !== null) {
+                            videos.push({ duration, size, url, downloadUrl })
+                        }
                     }
                 }
 
-                //check if videos array is not empty to push it to data array
+                // Check if videos array is not empty to push it to data array
                 if (videos.length > 0) {
-                    data.push({ date, subjectId, subjectName, teacher, roomId, videos })
+                    data.push({ date, subjectId, subjectName, teacher, videos })
                 }
             }
         })
     }
+
+    // If data array is empty, send a 404 response indicating no data found
+    if (data.length === 0) {
+        res.status(404).json({ message: 'No data found for the specified criteria.' })
+        return
+    }
+
+    // If downloadFile flag is true, create a file with the data and send it as a response
+    if (downloadFileFlag) {
+       
+        // Create a download file name based on the query parameters
+        const downloadFilename = `listar-videos_${pageFrom}-${pageTo}${subjectIds.length > 0 ? `_${subjectIds.join('_')}` : ''}${hasSubjectIdFlag ? '_hasSubjectId' : ''}${hasDownloadUrlFlag ? '_hasDownloadUrl' : ''}.json`
+
+        // Check if the public directory exists, if not, create it
+        if (!fs.existsSync('./public')) {
+            fs.mkdirSync('./public')
+        }
+
+        // Write the data to the file in JSON format
+        const filePath = `./public/${downloadFilename}`
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+        console.log(`Data written to file: ${filePath}`)
+
+        // Set headers to indicate a file download
+        res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`)
+        res.setHeader('Content-Type', 'application/json')
+        res.setHeader('Content-Length', fs.statSync(filePath).size)
+
+        // Send the file as a download response and handle any errors
+        res.download(filePath, (err) => {
+            if (err) {
+                console.error('Error downloading file:', err)
+            }
+            
+            // After sending the file, delete it from the server
+            fs.unlinkSync(filePath)
+        })
+        return
+    }
+
+    // If downloadFile flag is false, send the data as a JSON response
     res.json(data)
 })
 
