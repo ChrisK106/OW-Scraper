@@ -308,8 +308,10 @@ app.get('/listar-videos', async (req, res) => {
     let recordedClassesListUrl = domainUrl + '/AulasVirtuales/ClasesGrabadas/Lista?pagina='
 
     // Get page range from query params or default to 1-20
-    let pageFrom = req.query.from || 1
-    let pageTo = req.query.to || 20
+    let pageFrom = parseInt(req.query.from, 10);
+    let pageTo = parseInt(req.query.to, 10);
+    pageFrom = Number.isInteger(pageFrom) && pageFrom > 0 ? pageFrom : 1;
+    pageTo = Number.isInteger(pageTo) && pageTo > 0 ? pageTo : 20;
 
     // Get subjectIds from query params or default to an empty array
     // If subjectIds is provided, split it by '+' to get an array of subject IDs
@@ -413,7 +415,9 @@ app.get('/listar-videos', async (req, res) => {
     if (downloadFileFlag) {
        
         // Create a download file name based on the query parameters
-        const downloadFilename = `listar-videos_${pageFrom}-${pageTo}${subjectIds.length > 0 ? `_${subjectIds.join('_')}` : ''}${hasSubjectIdFlag ? '_hasSubjectId' : ''}${hasDownloadUrlFlag ? '_hasDownloadUrl' : ''}.json`
+        const unsafeFilename = `listar-videos_${pageFrom}-${pageTo}${subjectIds.length > 0 ? `_${subjectIds.join('_')}` : ''}${hasSubjectIdFlag ? '_hasSubjectId' : ''}${hasDownloadUrlFlag ? '_hasDownloadUrl' : ''}.json`;
+        const sanitizeFilename = require('sanitize-filename');
+        const downloadFilename = sanitizeFilename(unsafeFilename);
 
         // Check if the public directory exists, if not, create it
         if (!fs.existsSync('./public')) {
@@ -421,7 +425,12 @@ app.get('/listar-videos', async (req, res) => {
         }
 
         // Write the data to the file in JSON format
-        const filePath = `./public/${downloadFilename}`
+        const path = require('path');
+        const filePath = path.resolve('./public', downloadFilename);
+        if (!filePath.startsWith(path.resolve('./public'))) {
+            res.status(400).json({ message: 'Invalid file path.' });
+            return;
+        }
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
         console.log(`Data written to file: ${filePath}`)
 
