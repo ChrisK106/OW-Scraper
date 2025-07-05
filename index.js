@@ -28,7 +28,7 @@ app.use(cors({
 // Setting Express to use rate-limiting middleware
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, // max 10 requests per windowMs (10 requests per minute)
+  max: 20, // max 20 requests per windowMs (10 requests per minute)
 })
 
 // Apply rate limiter to all requests
