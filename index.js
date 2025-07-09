@@ -1,9 +1,11 @@
-import express from 'express'
-import rateLimit from 'express-rate-limit'
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import * as fs from 'node:fs';
+import axios from 'axios'
 import cors from 'cors'
+import express from 'express'
+import path from 'node:path';
+import rateLimit from 'express-rate-limit'
+import sanitizeFilename from 'sanitize-filename'
 
 // Constants
 const port = process.env.PORT || 8000;
@@ -416,7 +418,6 @@ app.get('/listar-videos', async (req, res) => {
        
         // Create a download file name based on the query parameters
         const unsafeFilename = `listar-videos_${pageFrom}-${pageTo}${subjectIds.length > 0 ? `_${subjectIds.join('_')}` : ''}${hasSubjectIdFlag ? '_hasSubjectId' : ''}${hasDownloadUrlFlag ? '_hasDownloadUrl' : ''}.json`;
-        const sanitizeFilename = require('sanitize-filename');
         const downloadFilename = sanitizeFilename(unsafeFilename);
 
         // Check if the public directory exists, if not, create it
@@ -425,7 +426,6 @@ app.get('/listar-videos', async (req, res) => {
         }
 
         // Write the data to the file in JSON format
-        const path = require('path');
         const filePath = path.resolve('./public', downloadFilename);
         if (!filePath.startsWith(path.resolve('./public'))) {
             res.status(400).json({ message: 'Invalid file path.' });
